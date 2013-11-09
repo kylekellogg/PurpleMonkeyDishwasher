@@ -77,8 +77,19 @@ Meteor.startup( function OnStartUp() {
 Meteor.methods( {
 	requestPlayerID: function() {
 		var id = Players.findOne( {ai: true} );
-		console.log( id );
+		Players.upsert( {_id: id._id}, {ai: false} );
+		console.log( id._id, Players.find( {ai: true} ).count() );
 		return id._id || -1;
+	},
+
+	returnPlayerID: function( id ) {
+		if ( id == -1 ) {
+			console.log( 'Bailed in returnPlayerID' );
+			return false;
+		}
+		Players.upsert( {_id: id}, {ai: true} );
+		console.log( id, Players.find( {ai: true} ).count() );
+		return true;
 	},
 
 	addPlayer: function() {
