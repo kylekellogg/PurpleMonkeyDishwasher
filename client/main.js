@@ -1,11 +1,16 @@
-Template.hello.greeting = function () {
-  return "Welcome to PurpleMonkeyDishwasher.";
-};
+var playerID;
 
-Template.hello.events({
-  'click input' : function () {
-    // template data, if any, is available in 'this'
-    if (typeof console !== 'undefined')
-      console.log("You pressed the button");
-  }
-});
+Meteor.call( 'requestPlayerID', function( e, r ) {
+	if ( e ) {
+		//	TODO: Handle error
+		console.log( 'Error getting playerID' );
+		return;
+	}
+
+	playerID = r;
+	if ( playerID == -1 ) {
+		console.log( 'playerID returned useless' );
+		return;
+	}
+	console.log( 'playerID:', playerID );
+} );
