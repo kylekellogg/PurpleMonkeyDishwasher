@@ -1,9 +1,4 @@
 var playerID;
-if (typeof window.Game === "undefined") {
-  window.Game = function() {
-    this.initialize.apply(this, arguments)
-  }
-}
 
 Meteor.call( 'requestPlayerID', function( e, r ) {
 	if ( e ) {
@@ -18,7 +13,15 @@ Meteor.call( 'requestPlayerID', function( e, r ) {
 		return;
 	}
 	console.log( 'playerID:', playerID );
-} );(function(proto){
+} );
+
+if (typeof window.Game === "undefined") {
+  window.Game = function() {
+    this.initialize.apply(this, arguments)
+  }
+}
+
+(function(proto){
   proto.initialize = function() {
     console.log("Starting the game")
   }
