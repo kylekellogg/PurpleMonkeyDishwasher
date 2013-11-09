@@ -2,7 +2,9 @@ if (typeof window.Game === "undefined") {
   window.Game = {};
 }
 
-var playerID;
+if ( typeof window.PlayerID === "undefined" ) {
+  window.PlayerID = "-1";
+}
 
 Game.Core = function() {
   this.initialize.apply(this, arguments)
@@ -40,12 +42,12 @@ Game.Core = function() {
       return;
     }
 
-    playerID = r;
-    if ( playerID == -1 ) {
-      console.log( 'playerID returned useless' );
+    window.PlayerID = r;
+    if ( window.PlayerID == -1 ) {
+      console.log( 'PlayerID returned useless' );
       return;
     }
-    console.log( 'playerID:', playerID );
+    console.log( 'PlayerID:', window.PlayerID );
   } );
 })(Game.Core.prototype);
 
