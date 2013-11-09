@@ -2,6 +2,8 @@ if (typeof window.Game === "undefined") {
   window.Game = {};
 }
 
+var playerID;
+
 Game.Core = function() {
   this.initialize.apply(this, arguments)
 };
@@ -30,5 +32,20 @@ Game.Core = function() {
       Context.drawImage(floorImg, 0, 0)
     })
   }
+
+  Meteor.call( 'requestPlayerID', function( e, r ) {
+    if ( e ) {
+      //	TODO: Handle error
+      console.log( 'Error getting playerID' );
+      return;
+    }
+
+    playerID = r;
+    if ( playerID == -1 ) {
+      console.log( 'playerID returned useless' );
+      return;
+    }
+    console.log( 'playerID:', playerID );
+  } );
 })(Game.Core.prototype);
 
