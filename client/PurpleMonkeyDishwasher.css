@@ -1,1 +1,8 @@
 /* CSS declarations go here */
+body {
+  background: black;
+}
+
+#game {
+  background: white;
+}
