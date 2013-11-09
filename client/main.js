@@ -1,10 +1,24 @@
+var playerID;
 if (typeof window.Game === "undefined") {
   window.Game = function() {
     this.initialize.apply(this, arguments)
   }
 }
 
-(function(proto){
+Meteor.call( 'requestPlayerID', function( e, r ) {
+	if ( e ) {
+		//	TODO: Handle error
+		console.log( 'Error getting playerID' );
+		return;
+	}
+
+	playerID = r;
+	if ( playerID == -1 ) {
+		console.log( 'playerID returned useless' );
+		return;
+	}
+	console.log( 'playerID:', playerID );
+} );(function(proto){
   proto.initialize = function() {
     console.log("Starting the game")
   }
