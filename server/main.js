@@ -4,7 +4,8 @@ var Games = new Meteor.Collection( "Games" ),
 	Roles = new Meteor.Collection( "Roles" ),
 	States = new Meteor.Collection( "States" ),
 	width = 3200,
-	height = 1800;
+	height = 1800,
+	gameIntervalID;
 
 function Game() {
 	this.players = [];
@@ -34,7 +35,11 @@ function GameLoop() {
 	//	TODO: Game logic, AI
 }
 
-Meteor.startup( function OnStartUp() {
+function Restart() {
+	if ( gameIntervalID ) {
+		Meteor.clearInterval( gameIntervalID );
+	}
+
 	Roles.remove( {} );
 	Roles.insert( {name: "Agent"} );
 	Roles.insert( {name: "Rogue"} );
@@ -69,15 +74,19 @@ Meteor.startup( function OnStartUp() {
 	}
 	Games.insert( game );
 
-	Meteor.publish( Games );
+	gameIntervalID = Meteor.setInterval( GameLoop, 1/30 );
+}
 
-	Meteor.setInterval( GameLoop, 1/30 );
+Meteor.startup( function OnStartUp() {
+	Restart()
+
+	Meteor.publish( Games );
 } );
 
 Meteor.methods( {
 	requestPlayerID: function() {
 		var id = Players.findOne( {ai: true} );
-		Players.upsert( {_id: id._id}, {ai: false} );
+		Players.update( {_id: id._id}, {ai: false} );
 		console.log( id._id, Players.find( {ai: true} ).count() );
 		return id._id || -1;
 	},
@@ -87,12 +96,25 @@ Meteor.methods( {
 			console.log( 'Bailed in returnPlayerID' );
 			return false;
 		}
-		Players.upsert( {_id: id}, {ai: true} );
+		Players.update( {_id: id}, {ai: true} );
 		console.log( id, Players.find( {ai: true} ).count() );
 		return true;
 	},
 
-	addPlayer: function() {
+	update: function( id, player ) {
+		if ( Match.test( player, Player ) ) {
+			var p = Players.findOne( {_id: id} );
+			if ( p ) {
+				Players.update( {_id: id}, player );
+				return true;
+			}
+			return false;
+		}
+		return false;
+	},
 
+	restart: function() {
+		Restart();
+		return true;
 	}
 } );
