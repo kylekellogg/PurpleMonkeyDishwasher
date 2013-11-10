@@ -1,8 +1,8 @@
-var Games = new Meteor.Collection( "Games" ),
-	Players = new Meteor.Collection( "Players" ),
-	Secrets = new Meteor.Collection( "Secrets" ),
-	Roles = new Meteor.Collection( "Roles" ),
-	States = new Meteor.Collection( "States" ),
+var Games = new Meteor.Collection( 'Games' ),
+	Players = new Meteor.Collection( 'Players' ),
+	Secrets = new Meteor.Collection( 'Secrets' ),
+	Roles = new Meteor.Collection( 'Roles' ),
+	States = new Meteor.Collection( 'States' ),
 	width = 3200,
 	height = 1800,
 	gameIntervalID;
@@ -41,15 +41,15 @@ function Restart() {
 	}
 
 	Roles.remove( {} );
-	Roles.insert( {name: "Agent"} );
-	Roles.insert( {name: "Rogue"} );
+	Roles.insert( {name: 'Agent'} );
+	Roles.insert( {name: 'Rogue'} );
 
 	States.remove( {} );
-	States.insert( {name: "Normal"} );
-	States.insert( {name: "Poisoned"} );
-	States.insert( {name: "Dead"} );
-	States.insert( {name: "Disabled"} );
-	States.insert( {name: "Alerted"} );
+	States.insert( {name: 'Normal'} );
+	States.insert( {name: 'Poisoned'} );
+	States.insert( {name: 'Dead'} );
+	States.insert( {name: 'Disabled'} );
+	States.insert( {name: 'Alerted'} );
 
 	Games.remove( {} );
 	Players.remove( {} );
@@ -60,8 +60,8 @@ function Restart() {
 		game.players.push( new Player() );
 		game.players[i].x = Math.round( Math.random() * width );
 		game.players[i].y = Math.round( Math.random() * height );
-		game.players[i].role = Roles.findOne( {name: "Agent"} );
-		game.players[i].state = Roles.findOne( {name: "Normal"} );
+		game.players[i].role = Roles.findOne( {name: 'Agent'} );
+		game.players[i].state = Roles.findOne( {name: 'Normal'} );
 		Players.insert( game.players[i] );
 
 		if ( s > 0 && Math.random() > 0.5 || l-i <= s ) {
@@ -80,19 +80,19 @@ function Restart() {
 Meteor.startup( function OnStartUp() {
 	Restart()
 
-	Meteor.publish( Games );
+	Meteor.publish( 'Players', function( pid ) {
+		return Players.find();
+	} );
 } );
 
 Meteor.methods( {
 	requestPlayerID: function() {
-		var id = Players.findOne( {ai: true} );
-		Players.update( {_id: id._id}, {ai: false} );
-		console.log( id._id, Players.find( {ai: true} ).count() );
-		return id._id || -1;
+		var p = Players.findOne( {ai: true} );
+		return p._id || '-1';
 	},
 
 	returnPlayerID: function( id ) {
-		if ( id == -1 ) {
+		if ( id === '-1' ) {
 			console.log( 'Bailed in returnPlayerID' );
 			return false;
 		}
@@ -102,14 +102,16 @@ Meteor.methods( {
 	},
 
 	update: function( id, player ) {
-		if ( Match.test( player, Player ) ) {
+		if ( Match.test( player, {x: Number, y: Number, bullets: Number, poison: Number, ai: Boolean, role: String, state: String} ) ) {
 			var p = Players.findOne( {_id: id} );
 			if ( p ) {
 				Players.update( {_id: id}, player );
 				return true;
 			}
+			console.log( 'no player' );
 			return false;
 		}
+		console.log( 'bad match' );
 		return false;
 	},
 
