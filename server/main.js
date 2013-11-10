@@ -15,6 +15,7 @@ function Game() {
 function Player() {
 	this.x = 0;
 	this.y = 0;
+  	this.fill = 'rgb(255,255,255)';
 
 	this.bullets = 6;
 	this.poison = 6;
@@ -91,21 +92,14 @@ Meteor.methods( {
 		return p._id || '-1';
 	},
 
-	returnPlayerID: function( id ) {
-		if ( id === '-1' ) {
-			console.log( 'Bailed in returnPlayerID' );
-			return false;
-		}
-		Players.update( {_id: id}, {ai: true} );
-		console.log( id, Players.find( {ai: true} ).count() );
-		return true;
-	},
-
 	update: function( id, player ) {
-		if ( Match.test( player, {x: Number, y: Number, bullets: Number, poison: Number, ai: Boolean, role: String, state: String} ) ) {
+		if ( Match.test( player, {x: Number, y: Number, fill: String, bullets: Number, poison: Number, ai: Boolean, role: String, state: String} ) ) {
 			var p = Players.findOne( {_id: id} );
 			if ( p ) {
 				Players.update( {_id: id}, player );
+				if ( p.ai !== player.ai ) {
+					console.log( id, Players.find( {ai: true} ).count() );
+				}
 				return true;
 			}
 			console.log( 'no player' );
