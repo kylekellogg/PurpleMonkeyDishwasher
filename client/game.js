@@ -9,33 +9,33 @@ Game.Core = function() {
 };
 
 (function(proto){
-  proto.initialize = function() {
+  proto.initialize = function(cvs, ctx) {
     console.log("Starting the game")
+    this.canvas = cvs;
+    this.context = ctx;
+
+    //var imgLoader = new ImageLoader();
+
+    //imgLoader.addImage("images/floor.jpg");
   }
 
-  proto.ready = function() {
-    var Canvas = document.getElementById("game")
-    var Context = Canvas.getContext("2d")
+  proto.run = function() {
+    this.enterFrame(this.draw);
+  }
 
-    var viewportWidth = window.innerWidth
-    var viewportHeight = window.innerHeight
-    var canvasWidth = Canvas.getAttribute("width")
-    var canvasHeight = Canvas.getAttribute("height")
+  proto.enterFrame = function(callback) {
+    callback();
 
-    Canvas.style.position = "absolute"
-    Canvas.style.top = (viewportHeight - canvasHeight) / 2 + "px"
-    Canvas.style.left = (viewportWidth - canvasWidth) / 2 + "px"
+    window.requestAnimationFrame(callback);
+  }
 
-    var floorImg = new Image()
-    floorImg.src = "images/floor.jpg"
-    floorImg.addEventListener("load", function() {
-      Context.drawImage(floorImg, 0, 0)
-    })
+  proto.draw = function() {
+    console.log("drawing");
   }
 
   Meteor.call( 'requestPlayerID', function( e, r ) {
     if ( e ) {
-      //	TODO: Handle error
+      // TODO: Handle error
       console.log( 'Error getting playerID' );
       return;
     }
