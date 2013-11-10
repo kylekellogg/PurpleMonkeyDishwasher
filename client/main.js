@@ -25,9 +25,6 @@ var players = {},
   rightActive = false,
   downActive = false,
 
-  mapX = 0,
-  mapY = 0,
-
 	playersCollection,
 	canvas,
 	context,
@@ -51,6 +48,8 @@ function Game() {
 function Player() {
 	this.x = 0;
 	this.y = 0;
+  this.mapX = 0;
+  this.mapY = 0;
   this.fill = 'rgb(255,255,255)';
 
 	this.bullets = 6;
@@ -102,8 +101,8 @@ function ready(e) {
     console.log( 'PlayerID:', pid );
 
     players[ pid ] = new Player();
-    players[ pid ].x = Math.round( Math.random() * (canvasWidth - 50) );
-    players[ pid ].y = Math.round( Math.random() * (canvasHeight - 50) );
+    players[ pid ].x = 50;
+    players[ pid ].y = 50;
     players[ pid ].ai = false;
     players[ pid ].fill = 'rgb('+Math.round(Math.random()*255)+','+Math.round(Math.random()*255)+','+Math.round(Math.random()*255)+')';
 
@@ -150,43 +149,86 @@ function ready(e) {
 
 function draw() {
   context.fillStyle = 'rgb(255,255,255)';
-	context.drawImage( bg, mapX, mapY );
+  var mx = !!pid && !!players && !!players[ pid ] ? players[ pid ].mapX : 0,
+    my = !!pid && !!players && !!players[ pid ] ? players[ pid ].mapY : 0;
+	context.drawImage( bg, mx, my );
 
 	for ( var id in players ) {
     context.fillStyle = players[ id ].fill || 'rgb(255,255,255)';
-		context.fillRect( players[ id ].x, players[ id ].y, 50, 50 );
+    var x = players[ id ].x,
+      y = players[ id ].y;
+    if ( id !== pid && !players[ id ].ai ) {
+      x = Math.abs( players[ id ].mapX ) + players[ id ].x + players[ pid ].mapX;
+      y = Math.abs( players[ id ].mapY ) + players[ id ].y + players[ pid ].mapY;
+    }
+		context.fillRect( x, y, 50, 50 );
 	}
 }
 
 //  Move using bool flags for directions
 function update() {
+  var p;
 	if ( leftActive ) {
     players[ pid ].x -= 5;
-    mapX += 5;
+    if ( players[ pid ].x < 50 ) players[ pid ].x = 50;
+
+    players[ pid ].mapX += 5;
+    if ( players[ pid ].mapX > 0 ) {
+      players[ pid ].mapX = 0;
+    } else {
+      for ( p in players ) {
+        if ( p !== pid && players[ p ].ai ) {
+          players[ p ].x += 5;
+        }
+      }
+    }
   }
   if ( rightActive ) {
     players[ pid ].x += 5;
-    mapX -= 5;
+    if ( players[ pid ].x > canvas.width - 100 ) players[ pid ].x = canvas.width - 100;
+
+    players[ pid ].mapX -= 5;
+    if ( players[ pid ].mapX < -(bg.width - canvas.width) ) {
+      players[ pid ].mapX = -(bg.width - canvas.width);
+    } else {
+      for ( p in players ) {
+        if ( p !== pid && players[ p ].ai ) {
+          players[ p ].x -= 5;
+        }
+      }
+    }
   }
 
   if ( upActive ) {
     players[ pid ].y -= 5;
-    mapY += 5;
+    if ( players[ pid ].y < 50 ) players[ pid ].y = 50;
+
+    players[ pid ].mapY += 5;
+    if ( players[ pid ].mapY > 0 ) {
+      players[ pid ].mapY = 0;
+    } else {
+      for ( p in players ) {
+        if ( p !== pid && players[ p ].ai ) {
+          players[ p ].y += 5;
+        }
+      }
+    }
   }
   if ( downActive ) {
     players[ pid ].y += 5;
-    mapY -= 5;
+    if ( players[ pid ].y > canvas.height - 100 ) players[ pid ].y = canvas.height - 100;
+
+    players[ pid ].mapY -= 5;
+    if ( players[ pid ].mapY < -(bg.height - canvas.height) ) {
+      players[ pid ].mapY = -(bg.height - canvas.height);
+    } else {
+      for ( p in players ) {
+        if ( p !== pid && players[ p ].ai ) {
+          players[ p ].y -= 5;
+        }
+      }
+    }
   }
-
-  if ( mapX > 0 ) mapX = 0;
-  if ( mapY > 0 ) mapY = 0;
-  if ( mapX < -(bg.width - canvas.width) ) mapX = -(bg.width - canvas.width);
-  if ( mapY < -(bg.height - canvas.height) ) mapY = -(bg.height - canvas.height);
-
-  if ( players[ pid ].x > canvas.width - 100 ) players[ pid ].x = canvas.width - 100;
-  if ( players[ pid ].y > canvas.height - 100 ) players[ pid ].y = canvas.height - 100;
-  if ( players[ pid ].x < 50 ) players[ pid ].x = 50;
-  if ( players[ pid ].y < 50 ) players[ pid ].y = 50;
 
 	Meteor.call( 'update', pid, players[ pid ] );
 }

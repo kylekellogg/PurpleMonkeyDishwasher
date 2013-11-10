@@ -15,6 +15,8 @@ function Game() {
 function Player() {
 	this.x = 0;
 	this.y = 0;
+	this.mapX = 0;
+	this.mapY = 0;
   	this.fill = 'rgb(255,255,255)';
 
 	this.bullets = 6;
@@ -93,7 +95,7 @@ Meteor.methods( {
 	},
 
 	update: function( id, player ) {
-		if ( Match.test( player, {x: Number, y: Number, fill: String, bullets: Number, poison: Number, ai: Boolean, role: String, state: String} ) ) {
+		if ( Match.test( player, {x: Number, y: Number, mapX: Number, mapY: Number, fill: String, bullets: Number, poison: Number, ai: Boolean, role: String, state: String} ) ) {
 			var p = Players.findOne( {_id: id} );
 			if ( p ) {
 				Players.update( {_id: id}, player );
