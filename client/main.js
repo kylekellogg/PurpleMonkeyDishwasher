@@ -21,5 +21,5 @@ Init.ready = function(e) {
 window.onload = Init.ready;
 
 window.onbeforeunload = function() {
-	Meteor.call( 'returnPlayerID', playerID );
+	Meteor.call( 'returnPlayerID', window.PlayerID );
 };
