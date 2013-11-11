@@ -142,18 +142,23 @@ function ready(e) {
     (function animLoop() {
     	requestAnimFrame( animLoop );
     	update();
+      drawBG();
+      testBounds();
       draw();
+      Meteor.call( 'update', pid, players[ pid ] );
     })();
   } );
 }
 
-function draw() {
+function drawBG() {
   context.fillStyle = 'rgb(255,255,255)';
   var mx = !!pid && !!players && !!players[ pid ] ? players[ pid ].mapX : 0,
     my = !!pid && !!players && !!players[ pid ] ? players[ pid ].mapY : 0;
-	context.drawImage( bg, mx, my );
+  context.drawImage( bg, mx, my );
+}
 
-	for ( var id in players ) {
+function draw() {
+  for ( var id in players ) {
     context.fillStyle = players[ id ].fill || 'rgb(255,255,255)';
     var x = players[ id ].x,
       y = players[ id ].y;
@@ -163,6 +168,77 @@ function draw() {
     }
 		context.fillRect( x, y, 50, 50 );
 	}
+}
+
+function testBounds() {
+  var walls = {
+      left: testLeft(),
+      right: testRight(),
+      up: testTop(),
+      down: testBottom()
+    };
+
+  if ( walls.left && leftActive ) {
+    players[ pid ].x += 5;
+    if ( players[ pid ].x > canvas.width - 100 ) players[ pid ].x = canvas.width - 100;
+
+    players[ pid ].mapX -= 5;
+    if ( players[ pid ].mapX < -(bg.width - canvas.width) ) {
+      players[ pid ].mapX = -(bg.width - canvas.width);
+    } else {
+      for ( p in players ) {
+        if ( p !== pid && players[ p ].ai ) {
+          players[ p ].x -= 5;
+        }
+      }
+    }
+  }
+  if ( walls.right && rightActive ) {
+    players[ pid ].x -= 5;
+    if ( players[ pid ].x < 50 ) players[ pid ].x = 50;
+
+    players[ pid ].mapX += 5;
+    if ( players[ pid ].mapX > 0 ) {
+      players[ pid ].mapX = 0;
+    } else {
+      for ( p in players ) {
+        if ( p !== pid && players[ p ].ai ) {
+          players[ p ].x += 5;
+        }
+      }
+    }
+  }
+
+  if ( walls.up && upActive ) {
+    players[ pid ].y += 5;
+    if ( players[ pid ].y > canvas.height - 100 ) players[ pid ].y = canvas.height - 100;
+
+    players[ pid ].mapY -= 5;
+    if ( players[ pid ].mapY < -(bg.height - canvas.height) ) {
+      players[ pid ].mapY = -(bg.height - canvas.height);
+    } else {
+      for ( p in players ) {
+        if ( p !== pid && players[ p ].ai ) {
+          players[ p ].y -= 5;
+        }
+      }
+    }
+  }
+  if ( walls.down && downActive ) {
+    players[ pid ].y -= 5;
+    if ( players[ pid ].y < 50 ) players[ pid ].y = 50;
+
+    players[ pid ].mapY += 5;
+    if ( players[ pid ].mapY > 0 ) {
+      players[ pid ].mapY = 0;
+    } else {
+      for ( p in players ) {
+        if ( p !== pid && players[ p ].ai ) {
+          players[ p ].y += 5;
+        }
+      }
+    }
+  }
 }
 
 //  Move using bool flags for directions
@@ -229,103 +305,86 @@ function update() {
       }
     }
   }
+}
 
-  var d = context.getImageData( players[ pid ].x, players[ pid ].y, 50, 50 ).data,
-    walls = {
-      left: false,
-      right: false,
-      up: false,
-      down: false
-    }
-  for ( var x = 0; x < 50; x++ ) {
-    for ( var y = 0; y < 50; y++ ) {
-      var pos = (y * 50 + x) * 4,
-        r = d[ pos ],
-        g = d[ pos + 1 ],
-        b = d[ pos + 2 ],
-        black = r === 0 && g === 0 && b === 0;
+function clamp( val, low, high ) {
+  return Math.min( Math.max( val, low ), high );
+}
 
-      if ( x === 0 && black ) {
-        console.log( 'up wall' );
-        walls.up = true;
-      } else if ( x === 49 && black ) {
-        console.log( 'down wall' );
-        walls.down = true;
-      }
+function testLeft( _x, _y, debug ) {
+  var x = _x === undefined ? clamp( players[ pid ].x - 5, 0, bg.width - 5 ) : _x,
+    y = _y === undefined ? clamp( players[ pid ].y, 0, bg.height - 50 ) : _y,
+    hit = testArea( x, y, 5, 50 );
 
-      if ( y === 0 && black ) {
-        console.log( 'left wall' );
-        walls.left = true;
-      } else if ( y === 49 && black ) {
-        console.log( 'right wall' );
-        walls.right = true;
+  if ( !!debug ) {
+    console.log( 'left hit?', hit );
+  }
+
+  return hit;
+}
+
+function testRight( _x, _y, debug ) {
+  var x = _x === undefined ? clamp( players[ pid ].x + 50, 0, bg.width - 5 ) : _x,
+    y = _y === undefined ? clamp( players[ pid ].y, 0, bg.height - 50 ) : _y,
+    hit = testArea( x, y, 5, 50 );
+
+  if ( !!debug ) {
+    console.log( 'right hit?', hit );
+  }
+
+  return testArea( x, y, 5, 50 );
+}
+
+function testTop( _x, _y, debug ) {
+  var x = _x === undefined ? clamp( players[ pid ].x, 0, bg.width - 50 ) : _x,
+    y = _y === undefined ? clamp( players[ pid ].y - 5, 0, bg.height - 5 ) : _y,
+    hit = testArea( x, y, 50, 5 );
+
+  if ( !!debug ) {
+    console.log( 'top hit?', hit );
+  }
+
+  return testArea( x, y, 50, 5 );
+}
+
+function testBottom( _x, _y, debug ) {
+  var x = _x === undefined ? clamp( players[ pid ].x, 0, bg.width - 50 ) : _x,
+    y = _y === undefined ? clamp( players[ pid ].y + 50, 0, bg.height - 5 ) : _y,
+    hit = testArea( x, y, 50, 5 );
+
+  if ( !!debug ) {
+    console.log( 'bottom hit?', hit );
+  }
+
+  return testArea( x, y, 50, 5 );
+}
+
+function testArea( x, y, w, h ) {
+  var d = context.getImageData( x, y, w, h ).data,
+    avg = 0,
+    pct = 0,
+    pos,
+    color;
+  for ( var i = 0; i < w; i++ ) {
+    for ( var j = 0; j < h; j++ ) {
+      pos = (j * w + i) * 4;
+      color = {
+        r: d[ pos ],
+        g: d[ pos + 1 ],
+        b: d[ pos + 2 ],
+        a: d[ pos + 3 ]
+      };
+      if ( near( color.r, 0, 5 ) && near( color.g, 0, 5 ) && near( color.b, 0, 5 ) && near( color.a, 255, 5 ) ) {
+        avg++;
       }
     }
   }
+  pct = avg / (w * h);
+  return pct >= 0.85;
+}
 
-  if ( walls.left && leftActive ) {
-    players[ pid ].x += 5;
-    if ( players[ pid ].x > canvas.width - 100 ) players[ pid ].x = canvas.width - 100;
-
-    players[ pid ].mapX -= 5;
-    if ( players[ pid ].mapX < -(bg.width - canvas.width) ) {
-      players[ pid ].mapX = -(bg.width - canvas.width);
-    } else {
-      for ( p in players ) {
-        if ( p !== pid && players[ p ].ai ) {
-          players[ p ].x -= 5;
-        }
-      }
-    }
-  }
-  if ( walls.right && rightActive ) {
-    players[ pid ].x -= 5;
-    if ( players[ pid ].x < 50 ) players[ pid ].x = 50;
-
-    players[ pid ].mapX += 5;
-    if ( players[ pid ].mapX > 0 ) {
-      players[ pid ].mapX = 0;
-    } else {
-      for ( p in players ) {
-        if ( p !== pid && players[ p ].ai ) {
-          players[ p ].x += 5;
-        }
-      }
-    }
-  }
-
-  if ( walls.up && upActive ) {
-    players[ pid ].y += 5;
-    if ( players[ pid ].y > canvas.height - 100 ) players[ pid ].y = canvas.height - 100;
-
-    players[ pid ].mapY -= 5;
-    if ( players[ pid ].mapY < -(bg.height - canvas.height) ) {
-      players[ pid ].mapY = -(bg.height - canvas.height);
-    } else {
-      for ( p in players ) {
-        if ( p !== pid && players[ p ].ai ) {
-          players[ p ].y -= 5;
-        }
-      }
-    }
-  }
-  if ( walls.down && downActive ) {
-    players[ pid ].y -= 5;
-    if ( players[ pid ].y < 50 ) players[ pid ].y = 50;
-
-    players[ pid ].mapY += 5;
-    if ( players[ pid ].mapY > 0 ) {
-      players[ pid ].mapY = 0;
-    } else {
-      for ( p in players ) {
-        if ( p !== pid && players[ p ].ai ) {
-          players[ p ].y += 5;
-        }
-      }
-    }
-  }
-
-	Meteor.call( 'update', pid, players[ pid ] );
+function near( val, target, leeway ) {
+  return val >= target - leeway && val <= target + leeway;
 }
 
 window.onload = ready;
