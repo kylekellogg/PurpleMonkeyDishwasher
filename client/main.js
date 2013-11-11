@@ -163,147 +163,85 @@ function draw() {
     var x = players[ id ].x,
       y = players[ id ].y;
     if ( id !== pid && !players[ id ].ai ) {
-      x = Math.abs( players[ id ].mapX ) + players[ id ].x + players[ pid ].mapX;
-      y = Math.abs( players[ id ].mapY ) + players[ id ].y + players[ pid ].mapY;
+      var mx = players[ id ].mapX,
+        my = players[ id ].mapY;
+      x = Math.abs( mx ) + x + mx;
+      y = Math.abs( my ) + y + my;
     }
 		context.fillRect( x, y, 50, 50 );
 	}
 }
 
-function testBounds() {
-  var walls = {
-      left: testLeft(),
-      right: testRight(),
-      up: testTop(),
-      down: testBottom()
-    };
+function move( val /* string */, amount, clampLow, clampHigh, mapClampLow, mapClampHigh ) {
+  var p,
+    map;
 
-  if ( walls.left && leftActive ) {
-    players[ pid ].x += 5;
-    if ( players[ pid ].x > canvas.width - 100 ) players[ pid ].x = canvas.width - 100;
+  val = ''+val;
+  map = 'map' + val.toUpperCase();
 
-    players[ pid ].mapX -= 5;
-    if ( players[ pid ].mapX < -(bg.width - canvas.width) ) {
-      players[ pid ].mapX = -(bg.width - canvas.width);
-    } else {
-      for ( p in players ) {
-        if ( p !== pid && players[ p ].ai ) {
-          players[ p ].x -= 5;
-        }
-      }
-    }
-  }
-  if ( walls.right && rightActive ) {
-    players[ pid ].x -= 5;
-    if ( players[ pid ].x < 50 ) players[ pid ].x = 50;
-
-    players[ pid ].mapX += 5;
-    if ( players[ pid ].mapX > 0 ) {
-      players[ pid ].mapX = 0;
-    } else {
-      for ( p in players ) {
-        if ( p !== pid && players[ p ].ai ) {
-          players[ p ].x += 5;
-        }
+  if ( players[ pid ][ val ] !== undefined ) {
+    players[ pid ][ val ] += amount;
+    //  Clamp player to bounds
+    if ( players[ pid ][ val ] < clampLow || players[ pid ][ val ] > clampHigh ) {
+      if ( players[ pid ][ val ] < clampLow ) {
+        players[ pid ][ val ] = clampLow;
+      } else {
+        players[ pid ][ val ] = clampHigh;
       }
     }
   }
 
-  if ( walls.up && upActive ) {
-    players[ pid ].y += 5;
-    if ( players[ pid ].y > canvas.height - 100 ) players[ pid ].y = canvas.height - 100;
+  if ( players[ pid ][ map ] !== undefined ) {
+    players[ pid ][ map ] -= amount;
 
-    players[ pid ].mapY -= 5;
-    if ( players[ pid ].mapY < -(bg.height - canvas.height) ) {
-      players[ pid ].mapY = -(bg.height - canvas.height);
-    } else {
-      for ( p in players ) {
-        if ( p !== pid && players[ p ].ai ) {
-          players[ p ].y -= 5;
-        }
+    //  Test bounds for map
+    if ( players[ pid ][ map ] < mapClampLow || players[ pid ][ map ] > mapClampHigh ) {
+      if ( players[ pid ][ map ] < mapClampLow ) {
+        players[ pid ][ map ] = mapClampLow;
+      } else {
+        players[ pid ][ map ] = mapClampHigh;
       }
-    }
-  }
-  if ( walls.down && downActive ) {
-    players[ pid ].y -= 5;
-    if ( players[ pid ].y < 50 ) players[ pid ].y = 50;
-
-    players[ pid ].mapY += 5;
-    if ( players[ pid ].mapY > 0 ) {
-      players[ pid ].mapY = 0;
     } else {
       for ( p in players ) {
-        if ( p !== pid && players[ p ].ai ) {
-          players[ p ].y += 5;
+        if ( p !== pid && players[ p ].ai && players[ p ][ val ] !== undefined ) {
+          players[ p ][ val ] -= amount;
         }
       }
     }
   }
 }
 
+function testBounds() {
+  if ( testLeft() && leftActive ) {
+    move( 'x', 5, 50, canvas.width - 100, -(bg.width - canvas.width), 0 );
+  }
+  if ( testRight() && rightActive ) {
+    console.log( 'move back' );
+    move( 'x', -5, 50, canvas.width - 100, -(bg.width - canvas.width), 0 );
+  }
+
+  if ( testTop() && upActive ) {
+    move( 'y', 5, 50, canvas.height - 100, -(bg.height - canvas.height), 0 );
+  }
+  if ( testBottom() && downActive ) {
+    move( 'y', -5, 50, canvas.height - 100, -(bg.height - canvas.height), 0 );
+  }
+}
+
 //  Move using bool flags for directions
 function update() {
-  var p;
 	if ( leftActive ) {
-    players[ pid ].x -= 5;
-    if ( players[ pid ].x < 50 ) players[ pid ].x = 50;
-
-    players[ pid ].mapX += 5;
-    if ( players[ pid ].mapX > 0 ) {
-      players[ pid ].mapX = 0;
-    } else {
-      for ( p in players ) {
-        if ( p !== pid && players[ p ].ai ) {
-          players[ p ].x += 5;
-        }
-      }
-    }
+    move( 'x', -5, 50, canvas.width - 100, -(bg.width - canvas.width), 0 );
   }
   if ( rightActive ) {
-    players[ pid ].x += 5;
-    if ( players[ pid ].x > canvas.width - 100 ) players[ pid ].x = canvas.width - 100;
-
-    players[ pid ].mapX -= 5;
-    if ( players[ pid ].mapX < -(bg.width - canvas.width) ) {
-      players[ pid ].mapX = -(bg.width - canvas.width);
-    } else {
-      for ( p in players ) {
-        if ( p !== pid && players[ p ].ai ) {
-          players[ p ].x -= 5;
-        }
-      }
-    }
+    move( 'x', 5, 50, canvas.width - 100, -(bg.width - canvas.width), 0 );
   }
 
   if ( upActive ) {
-    players[ pid ].y -= 5;
-    if ( players[ pid ].y < 50 ) players[ pid ].y = 50;
-
-    players[ pid ].mapY += 5;
-    if ( players[ pid ].mapY > 0 ) {
-      players[ pid ].mapY = 0;
-    } else {
-      for ( p in players ) {
-        if ( p !== pid && players[ p ].ai ) {
-          players[ p ].y += 5;
-        }
-      }
-    }
+    move( 'y', -5, 50, canvas.height - 100, -(bg.height - canvas.height), 0 );
   }
   if ( downActive ) {
-    players[ pid ].y += 5;
-    if ( players[ pid ].y > canvas.height - 100 ) players[ pid ].y = canvas.height - 100;
-
-    players[ pid ].mapY -= 5;
-    if ( players[ pid ].mapY < -(bg.height - canvas.height) ) {
-      players[ pid ].mapY = -(bg.height - canvas.height);
-    } else {
-      for ( p in players ) {
-        if ( p !== pid && players[ p ].ai ) {
-          players[ p ].y -= 5;
-        }
-      }
-    }
+    move( 'y', 5, 50, canvas.height - 100, -(bg.height - canvas.height), 0 );
   }
 }
 
@@ -312,7 +250,7 @@ function clamp( val, low, high ) {
 }
 
 function testLeft( _x, _y, debug ) {
-  var x = _x === undefined ? clamp( players[ pid ].x - 5, 0, bg.width - 5 ) : _x,
+  var x = _x === undefined ? clamp( players[ pid ].x, 0, bg.width ) : _x,
     y = _y === undefined ? clamp( players[ pid ].y, 0, bg.height - 50 ) : _y,
     hit = testArea( x, y, 5, 50 );
 
@@ -324,7 +262,7 @@ function testLeft( _x, _y, debug ) {
 }
 
 function testRight( _x, _y, debug ) {
-  var x = _x === undefined ? clamp( players[ pid ].x + 50, 0, bg.width - 5 ) : _x,
+  var x = _x === undefined ? clamp( players[ pid ].x + 50, 0, bg.width ) : _x,
     y = _y === undefined ? clamp( players[ pid ].y, 0, bg.height - 50 ) : _y,
     hit = testArea( x, y, 5, 50 );
 
@@ -337,7 +275,7 @@ function testRight( _x, _y, debug ) {
 
 function testTop( _x, _y, debug ) {
   var x = _x === undefined ? clamp( players[ pid ].x, 0, bg.width - 50 ) : _x,
-    y = _y === undefined ? clamp( players[ pid ].y - 5, 0, bg.height - 5 ) : _y,
+    y = _y === undefined ? clamp( players[ pid ].y, 0, bg.height ) : _y,
     hit = testArea( x, y, 50, 5 );
 
   if ( !!debug ) {
@@ -349,7 +287,7 @@ function testTop( _x, _y, debug ) {
 
 function testBottom( _x, _y, debug ) {
   var x = _x === undefined ? clamp( players[ pid ].x, 0, bg.width - 50 ) : _x,
-    y = _y === undefined ? clamp( players[ pid ].y + 50, 0, bg.height - 5 ) : _y,
+    y = _y === undefined ? clamp( players[ pid ].y + 50, 0, bg.height ) : _y,
     hit = testArea( x, y, 50, 5 );
 
   if ( !!debug ) {
