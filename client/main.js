@@ -230,6 +230,101 @@ function update() {
     }
   }
 
+  var d = context.getImageData( players[ pid ].x, players[ pid ].y, 50, 50 ).data,
+    walls = {
+      left: false,
+      right: false,
+      up: false,
+      down: false
+    }
+  for ( var x = 0; x < 50; x++ ) {
+    for ( var y = 0; y < 50; y++ ) {
+      var pos = (y * 50 + x) * 4,
+        r = d[ pos ],
+        g = d[ pos + 1 ],
+        b = d[ pos + 2 ],
+        black = r === 0 && g === 0 && b === 0;
+
+      if ( x === 0 && black ) {
+        console.log( 'up wall' );
+        walls.up = true;
+      } else if ( x === 49 && black ) {
+        console.log( 'down wall' );
+        walls.down = true;
+      }
+
+      if ( y === 0 && black ) {
+        console.log( 'left wall' );
+        walls.left = true;
+      } else if ( y === 49 && black ) {
+        console.log( 'right wall' );
+        walls.right = true;
+      }
+    }
+  }
+
+  if ( walls.left && leftActive ) {
+    players[ pid ].x += 5;
+    if ( players[ pid ].x > canvas.width - 100 ) players[ pid ].x = canvas.width - 100;
+
+    players[ pid ].mapX -= 5;
+    if ( players[ pid ].mapX < -(bg.width - canvas.width) ) {
+      players[ pid ].mapX = -(bg.width - canvas.width);
+    } else {
+      for ( p in players ) {
+        if ( p !== pid && players[ p ].ai ) {
+          players[ p ].x -= 5;
+        }
+      }
+    }
+  }
+  if ( walls.right && rightActive ) {
+    players[ pid ].x -= 5;
+    if ( players[ pid ].x < 50 ) players[ pid ].x = 50;
+
+    players[ pid ].mapX += 5;
+    if ( players[ pid ].mapX > 0 ) {
+      players[ pid ].mapX = 0;
+    } else {
+      for ( p in players ) {
+        if ( p !== pid && players[ p ].ai ) {
+          players[ p ].x += 5;
+        }
+      }
+    }
+  }
+
+  if ( walls.up && upActive ) {
+    players[ pid ].y += 5;
+    if ( players[ pid ].y > canvas.height - 100 ) players[ pid ].y = canvas.height - 100;
+
+    players[ pid ].mapY -= 5;
+    if ( players[ pid ].mapY < -(bg.height - canvas.height) ) {
+      players[ pid ].mapY = -(bg.height - canvas.height);
+    } else {
+      for ( p in players ) {
+        if ( p !== pid && players[ p ].ai ) {
+          players[ p ].y -= 5;
+        }
+      }
+    }
+  }
+  if ( walls.down && downActive ) {
+    players[ pid ].y -= 5;
+    if ( players[ pid ].y < 50 ) players[ pid ].y = 50;
+
+    players[ pid ].mapY += 5;
+    if ( players[ pid ].mapY > 0 ) {
+      players[ pid ].mapY = 0;
+    } else {
+      for ( p in players ) {
+        if ( p !== pid && players[ p ].ai ) {
+          players[ p ].y += 5;
+        }
+      }
+    }
+  }
+
 	Meteor.call( 'update', pid, players[ pid ] );
 }
 
