@@ -25,6 +25,8 @@ var players = {},
   rightActive = false,
   downActive = false,
 
+  frameCount = 0,
+
 	playersCollection,
 	canvas,
 	context,
@@ -142,26 +144,30 @@ function ready(e) {
     (function animLoop() {
     	requestAnimFrame( animLoop );
     	update();
+      //  Make sure only checking against bg image and not players as well
       drawBG();
       testBounds();
       draw();
       Meteor.call( 'update', pid, players[ pid ] );
+      frameCount++;
     })();
   } );
 }
 
 function drawBG() {
-  context.fillStyle = 'rgb(255,255,255)';
   var mx = !!pid && !!players && !!players[ pid ] ? players[ pid ].mapX : 0,
     my = !!pid && !!players && !!players[ pid ] ? players[ pid ].mapY : 0;
+  context.fillStyle = 'rgb(255,255,255)';
   context.drawImage( bg, mx, my );
 }
 
 function draw() {
+  drawBG();
+
   for ( var id in players ) {
-    context.fillStyle = players[ id ].fill || 'rgb(255,255,255)';
     var x = players[ id ].x,
       y = players[ id ].y;
+    context.fillStyle = players[ id ].fill || 'rgb(255,255,255)';
     if ( id !== pid && !players[ id ].ai ) {
       var mx = players[ id ].mapX,
         my = players[ id ].mapY;
@@ -174,13 +180,15 @@ function draw() {
 
 function move( val /* string */, amount, clampLow, clampHigh, mapClampLow, mapClampHigh ) {
   var p,
-    map;
+    map,
+    r;
 
   val = ''+val;
   map = 'map' + val.toUpperCase();
 
   if ( players[ pid ][ val ] !== undefined ) {
     players[ pid ][ val ] += amount;
+
     //  Clamp player to bounds
     if ( players[ pid ][ val ] < clampLow || players[ pid ][ val ] > clampHigh ) {
       if ( players[ pid ][ val ] < clampLow ) {
@@ -212,20 +220,44 @@ function move( val /* string */, amount, clampLow, clampHigh, mapClampLow, mapCl
 }
 
 function testBounds() {
-  if ( testLeft() && leftActive ) {
-    move( 'x', 5, 50, canvas.width - 100, -(bg.width - canvas.width), 0 );
-  }
-  if ( testRight() && rightActive ) {
-    console.log( 'move back' );
-    move( 'x', -5, 50, canvas.width - 100, -(bg.width - canvas.width), 0 );
+  var hasHit = false;
+
+  if ( testPlayer() ) {
+    hasHit = true;
+    if ( leftActive ) {
+      move( 'x', 5, 50, canvas.width - 100, -(bg.width - canvas.width), 0 );
+    }
+    if ( rightActive ) {
+      move( 'x', -5, 50, canvas.width - 100, -(bg.width - canvas.width), 0 );
+    }
+    if ( upActive ) {
+      move( 'y', 5, 50, canvas.height - 100, -(bg.height - canvas.height), 0 );
+    }
+    if ( downActive ) {
+      move( 'y', -5, 50, canvas.height - 100, -(bg.height - canvas.height), 0 );
+    }
+    return hasHit;
   }
 
-  if ( testTop() && upActive ) {
+  if ( testLeft() ) {
+    move( 'x', 5, 50, canvas.width - 100, -(bg.width - canvas.width), 0 );
+    hasHit = true;
+  }
+  if ( testRight() ) {
+    move( 'x', -5, 50, canvas.width - 100, -(bg.width - canvas.width), 0 );
+    hasHit = true;
+  }
+
+  if ( testTop() ) {
     move( 'y', 5, 50, canvas.height - 100, -(bg.height - canvas.height), 0 );
+    hasHit = true;
   }
-  if ( testBottom() && downActive ) {
+  if ( testBottom() ) {
     move( 'y', -5, 50, canvas.height - 100, -(bg.height - canvas.height), 0 );
+    hasHit = true;
   }
+
+  return hasHit;
 }
 
 //  Move using bool flags for directions
@@ -249,10 +281,22 @@ function clamp( val, low, high ) {
   return Math.min( Math.max( val, low ), high );
 }
 
+function testPlayer( _x, _y, debug ) {
+  var x = _x === undefined ? clamp( players[ pid ].x, 0, bg.width ) : _x,
+    y = _y === undefined ? clamp( players[ pid ].y, 0, bg.height ) : _y,
+    hit = testArea( x, y, 50, 50, 0.05, debug );
+
+  if ( !!debug ) {
+    console.log( 'player hit?', hit );
+  }
+
+  return hit;
+}
+
 function testLeft( _x, _y, debug ) {
   var x = _x === undefined ? clamp( players[ pid ].x, 0, bg.width ) : _x,
-    y = _y === undefined ? clamp( players[ pid ].y, 0, bg.height - 50 ) : _y,
-    hit = testArea( x, y, 5, 50 );
+    y = _y === undefined ? clamp( players[ pid ].y, 0, bg.height ) : _y,
+    hit = testArea( x, y, 5, 50, 0.85, debug );
 
   if ( !!debug ) {
     console.log( 'left hit?', hit );
@@ -262,45 +306,46 @@ function testLeft( _x, _y, debug ) {
 }
 
 function testRight( _x, _y, debug ) {
-  var x = _x === undefined ? clamp( players[ pid ].x + 50, 0, bg.width ) : _x,
-    y = _y === undefined ? clamp( players[ pid ].y, 0, bg.height - 50 ) : _y,
-    hit = testArea( x, y, 5, 50 );
+  var x = _x === undefined ? clamp( players[ pid ].x + 45, 0, bg.width ) : _x,
+    y = _y === undefined ? clamp( players[ pid ].y, 0, bg.height ) : _y,
+    hit = testArea( x, y, 5, 50, 0.85, debug );
 
   if ( !!debug ) {
     console.log( 'right hit?', hit );
   }
 
-  return testArea( x, y, 5, 50 );
+  return hit;
 }
 
 function testTop( _x, _y, debug ) {
-  var x = _x === undefined ? clamp( players[ pid ].x, 0, bg.width - 50 ) : _x,
+  var x = _x === undefined ? clamp( players[ pid ].x, 0, bg.width ) : _x,
     y = _y === undefined ? clamp( players[ pid ].y, 0, bg.height ) : _y,
-    hit = testArea( x, y, 50, 5 );
+    hit = testArea( x, y, 50, 5, 0.85, debug );
 
   if ( !!debug ) {
     console.log( 'top hit?', hit );
   }
 
-  return testArea( x, y, 50, 5 );
+  return hit;
 }
 
 function testBottom( _x, _y, debug ) {
-  var x = _x === undefined ? clamp( players[ pid ].x, 0, bg.width - 50 ) : _x,
-    y = _y === undefined ? clamp( players[ pid ].y + 50, 0, bg.height ) : _y,
-    hit = testArea( x, y, 50, 5 );
+  var x = _x === undefined ? clamp( players[ pid ].x, 0, bg.width ) : _x,
+    y = _y === undefined ? clamp( players[ pid ].y + 45, 0, bg.height ) : _y,
+    hit = testArea( x, y, 50, 5, 0.85, debug );
 
   if ( !!debug ) {
     console.log( 'bottom hit?', hit );
   }
 
-  return testArea( x, y, 50, 5 );
+  return hit;
 }
 
-function testArea( x, y, w, h ) {
+function testArea( x, y, w, h, allowance, debug ) {
   var d = context.getImageData( x, y, w, h ).data,
     avg = 0,
     pct = 0,
+    alw = allowance !== undefined ? +allowance : 0.85,
     pos,
     color;
   for ( var i = 0; i < w; i++ ) {
@@ -318,7 +363,10 @@ function testArea( x, y, w, h ) {
     }
   }
   pct = avg / (w * h);
-  return pct >= 0.85;
+  if ( !!debug ) {
+    console.log( (pct * 100) + '%' );
+  }
+  return pct >= alw;
 }
 
 function near( val, target, leeway ) {
