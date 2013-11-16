@@ -1,5 +1,5 @@
 var players = {},
-	pid = '-1',
+  pid = '-1',
 
   keys = {
     'Left': 37,
@@ -25,13 +25,15 @@ var players = {},
   rightActive = false,
   downActive = false,
 
+  walls = {},
+  wallImages = [],
+
   frameCount = 0,
 
-	playersCollection,
-	canvas,
-	context,
-	theGame,
-	bg;
+  playersCollection,
+  canvas,
+  context,
+  bg;
 
 window.requestAnimFrame = (function(){
   return  window.requestAnimationFrame       ||
@@ -42,31 +44,28 @@ window.requestAnimFrame = (function(){
           };
 })();
 
-function Game() {
-	this.players = [];
-	this.secrets = [];
-}
-
 function Player() {
-	this.x = 0;
-	this.y = 0;
+  this.x = 0;
+  this.y = 0;
+  this.width = 50;
+  this.height = 50;
   this.mapX = 0;
   this.mapY = 0;
   this.fill = 'rgb(255,255,255)';
 
-	this.bullets = 6;
-	this.poison = 6;
+  this.bullets = 6;
+  this.poison = 6;
 
-	this.ai = true;
-	this.role = '';
-	this.state = '';
+  this.ai = true;
+  this.role = '';
+  this.state = '';
 }
 
-function Secret() {
-	this.x = 0;
-	this.y = 0;
-
-	this.type = '';
+function Wall( _x, _y, _w, _h ) {
+  this.x = ~~_x;
+  this.y = ~~_y;
+  this.width = Math.max( ~~_w, 50 );
+  this.height = Math.max( ~~_h, 50 );
 }
 
 function ready(e) {
@@ -81,12 +80,6 @@ function ready(e) {
   canvas.style.position = "absolute";
   canvas.style.top = (viewportHeight - canvasHeight) / 2 + "px";
   canvas.style.left = (viewportWidth - canvasWidth) / 2 + "px";
-
-  bg = new Image();
-  bg.addEventListener( 'load', function() {
-  	draw();
-  } );
-  bg.src = 'images/floor.jpg?' + Date.now();
 
   Meteor.call( 'requestPlayerID', function( e, r ) {
     if ( e ) {
@@ -111,58 +104,137 @@ function ready(e) {
     Meteor.call( 'update', pid, players[ pid ] );
 
     Meteor.subscribe( 'Players', function() {
-    	//
+      //
     } );
 
     playersCollection = new Meteor.Collection( 'Players' );
 
     playersCollection.find().observe( {
-    	added: function( n ) {
-    		if ( !players[ n._id ] ) {
-    			players[ n._id ] = n;
-    			delete players[ n._id ]._id;
-    		}
-    	},
+      added: function( n ) {
+        if ( !players[ n._id ] ) {
+          players[ n._id ] = n;
+          delete players[ n._id ]._id;
+        }
+      },
 
-    	changed: function( n, o ) {
+      changed: function( n, o ) {
         if ( n._id === pid ) {
           return;
         }
-    		if ( players[ n._id ] ) {
-    			players[ n._id ] = n;
-    			delete players[ n._id ]._id;
-    		}
-    	},
+        if ( players[ n._id ] ) {
+          players[ n._id ] = n;
+          delete players[ n._id ]._id;
+        }
+      },
 
-    	removed: function( n ) {
-    		if ( players[ n._id ] ) {
-    			delete players[ n._id ];
-    		}
-    	}
+      removed: function( n ) {
+        if ( players[ n._id ] ) {
+          delete players[ n._id ];
+        }
+      }
     } );
-
-    (function animLoop() {
-    	requestAnimFrame( animLoop );
-    	update();
-      //  Make sure only checking against bg image and not players as well
-      drawBG();
-      testBounds();
-      draw();
-      Meteor.call( 'update', pid, players[ pid ] );
-      frameCount++;
-    })();
   } );
+
+  bg = new Image();
+  bg.addEventListener( 'load', function() {
+    console.log( 'bg', bg.width, bg.height );
+    findWalls();
+  } );
+  bg.src = 'images/floor.jpg?' + Date.now();
+}
+
+function findWalls() {
+  var x,y,lx,ly,queue;
+  drawBG();
+
+  var mx = 0,
+    my = 0;
+
+  context.fillStyle = 'rgb(255,255,255)';
+
+  for ( x = 0, lx = bg.width; x < lx; x += 50 ) {
+    for ( y = 0, ly = bg.height; y < ly; y += 50 ) {
+      mx = Math.floor(x / canvas.width) * canvas.width;
+      my = Math.floor(y / canvas.height) * canvas.height;
+      context.drawImage( bg, -mx, -my );
+      if ( testWall( x-mx, y-my, 50, 50, 0.85, false ) ) {
+        if ( !walls[mx] ) {
+          walls[mx] = {};
+        }
+        if ( !walls[mx][my] ) {
+          walls[mx][my] = [];
+        }
+        walls[ mx ][ my ].push( new Wall( x, y, 50, 50 ) );
+      }
+    }
+  }
+
+  context.clearRect( 0, 0, bg.width, bg.height );
+  context.fillStyle = "rgb(255,0,0)";
+
+  queue = [];
+
+  for ( x = 0, lx = bg.width; x < lx; x += canvas.width ) {
+    for ( y = 0, ly = bg.height; y < ly; y += canvas.height ) {
+      var img = new Image();
+      img.addEventListener( 'load', function() {
+        if ( queue.length ) {
+          var o = queue.shift();
+          o.img.src = o.src;
+        } else {
+          (function animLoop() {
+            requestAnimFrame( animLoop );
+            //  Make sure only checking against bg image and not players as well
+            drawBG();
+            update();
+            draw();
+            Meteor.call( 'update', pid, players[ pid ] );
+            frameCount++;
+          })();
+        }
+      } );
+
+      context.clearRect( 0, 0, canvas.width, canvas.height );
+
+      for ( var i = 0, l = walls[x][y].length; i < l; i++ ) {
+        var wall = walls[x][y][i],
+          _x = wall.x - x,
+          _y = wall.y - y;
+        context.fillRect( _x, _y, wall.width, wall.height );
+      }
+
+      wallImages.push( {
+        img: img,
+        x: x,
+        y: y
+      } );
+
+      queue.push( {src: canvas.toDataURL(), img: wallImages[ wallImages.length - 1 ].img} );
+    }
+  }
+
+  var o = queue.shift();
+  o.img.src = o.src;
 }
 
 function drawBG() {
   var mx = !!pid && !!players && !!players[ pid ] ? players[ pid ].mapX : 0,
     my = !!pid && !!players && !!players[ pid ] ? players[ pid ].mapY : 0;
+  context.clearRect( 0, 0, canvas.width, canvas.height );
   context.fillStyle = 'rgb(255,255,255)';
   context.drawImage( bg, mx, my );
+  if ( wallImages ) {
+    for ( var i = 0, l = wallImages.length; i < l; i++ ) {
+      var wallImage = wallImages[ i ],
+        x = wallImage.x + mx,
+        y = wallImage.y + my;
+      context.drawImage( wallImage.img, x, y );
+    }
+  }
 }
 
 function draw() {
-  drawBG();
+  //drawBG();
 
   for ( var id in players ) {
     var x = players[ id ].x,
@@ -174,14 +246,13 @@ function draw() {
       x = Math.abs( mx ) + x + mx;
       y = Math.abs( my ) + y + my;
     }
-		context.fillRect( x, y, 50, 50 );
-	}
+    context.fillRect( x, y, players[ id ].width, players[ id ].height );
+  }
 }
 
 function move( val /* string */, amount, clampLow, clampHigh, mapClampLow, mapClampHigh ) {
   var p,
-    map,
-    r;
+    map;
 
   val = ''+val;
   map = 'map' + val.toUpperCase();
@@ -210,6 +281,9 @@ function move( val /* string */, amount, clampLow, clampHigh, mapClampLow, mapCl
         players[ pid ][ map ] = mapClampHigh;
       }
     } else {
+      for ( var w in walls ) {
+        w[ val ] -= amount;
+      }
       for ( p in players ) {
         if ( p !== pid && players[ p ].ai && players[ p ][ val ] !== undefined ) {
           players[ p ][ val ] -= amount;
@@ -219,129 +293,79 @@ function move( val /* string */, amount, clampLow, clampHigh, mapClampLow, mapCl
   }
 }
 
-function testBounds() {
-  var hasHit = false;
-
-  if ( testPlayer() ) {
-    hasHit = true;
-    if ( leftActive ) {
-      move( 'x', 5, 50, canvas.width - 100, -(bg.width - canvas.width), 0 );
-    }
-    if ( rightActive ) {
-      move( 'x', -5, 50, canvas.width - 100, -(bg.width - canvas.width), 0 );
-    }
-    if ( upActive ) {
-      move( 'y', 5, 50, canvas.height - 100, -(bg.height - canvas.height), 0 );
-    }
-    if ( downActive ) {
-      move( 'y', -5, 50, canvas.height - 100, -(bg.height - canvas.height), 0 );
-    }
-    return hasHit;
-  }
-
-  if ( testLeft() ) {
-    move( 'x', 5, 50, canvas.width - 100, -(bg.width - canvas.width), 0 );
-    hasHit = true;
-  }
-  if ( testRight() ) {
-    move( 'x', -5, 50, canvas.width - 100, -(bg.width - canvas.width), 0 );
-    hasHit = true;
-  }
-
-  if ( testTop() ) {
-    move( 'y', 5, 50, canvas.height - 100, -(bg.height - canvas.height), 0 );
-    hasHit = true;
-  }
-  if ( testBottom() ) {
-    move( 'y', -5, 50, canvas.height - 100, -(bg.height - canvas.height), 0 );
-    hasHit = true;
-  }
-
-  return hasHit;
-}
-
 //  Move using bool flags for directions
 function update() {
-	if ( leftActive ) {
-    move( 'x', -5, 50, canvas.width - 100, -(bg.width - canvas.width), 0 );
-  }
-  if ( rightActive ) {
-    move( 'x', 5, 50, canvas.width - 100, -(bg.width - canvas.width), 0 );
+  if ( leftActive ) {
+    move( 'x', -5, players[ pid ].width, canvas.width - 100, -(bg.width - canvas.width), 0 );
+  } else if ( rightActive ) {
+    move( 'x', 5, players[ pid ].width, canvas.width - 100, -(bg.width - canvas.width), 0 );
+  } else if ( upActive ) {
+    move( 'y', -5, players[ pid ].height, canvas.height - 100, -(bg.height - canvas.height), 0 );
+  } else if ( downActive ) {
+    move( 'y', 5, players[ pid ].height, canvas.height - 100, -(bg.height - canvas.height), 0 );
   }
 
-  if ( upActive ) {
-    move( 'y', -5, 50, canvas.height - 100, -(bg.height - canvas.height), 0 );
+  for ( var x in walls ) {
+    if ( walls.hasOwnProperty( x ) ) {
+      for ( var y in walls[x] ) {
+        if ( walls[x].hasOwnProperty( y ) ) {
+          for ( var i = 0, l = walls[x][y].length; i < l; i++ ) {
+            var wall = walls[x][y][i],
+              mockWall = new Wall( wall.x + players[ pid ].mapX, wall.y + players[ pid ].mapY, wall.width, wall.height ),
+              intersection = intersects( players[ pid ], mockWall );
+            if ( !!intersection ) {
+              if ( intersection.width === 0 || intersection.height === 0 ) continue;
+
+              if ( leftActive ) {
+                move( 'x', intersection.width, players[ pid ].width, canvas.width - 100, -(bg.width - canvas.width), 0 );
+              } else if ( rightActive ) {
+                move( 'x', -intersection.width, players[ pid ].width, canvas.width - 100, -(bg.width - canvas.width), 0 );
+              } else if ( upActive ) {
+                move( 'y', intersection.height, players[ pid ].height, canvas.height - 100, -(bg.height - canvas.height), 0 );
+              } else if ( downActive ) {
+                move( 'y', -intersection.height, players[ pid ].height, canvas.height - 100, -(bg.height - canvas.height), 0 );
+              }
+            }
+          }
+        }
+      }
+    }
   }
-  if ( downActive ) {
-    move( 'y', 5, 50, canvas.height - 100, -(bg.height - canvas.height), 0 );
+}
+
+function intersects( a, b ) {
+  var x = (a.x < b.x + b.width && a.x >= b.x) || (a.x + a.width >= b.x && a.x + a.width < b.x + b.width),
+    y = (a.y < b.y + b.height && a.y >= b.y) || (a.y + a.height >= b.y && a.y + a.height < b.y + b.height);
+
+  if ( x && y ) {
+    var rect = {};
+    // get rectangle to return here
+    if ( b.x > a.x ) {
+      rect.x = a.x + (b.x - a.x);
+      rect.width = a.x + a.width - rect.x;
+    } else {
+      rect.x = b.x + (a.x - b.x);
+      rect.width = b.x + b.width - rect.x;
+    }
+
+    if ( b.y > a.y ) {
+      rect.y = a.y + (b.y - a.y);
+      rect.height = a.y + a.height - rect.y;
+    } else {
+      rect.y = b.y + (a.y - b.y);
+      rect.height = b.y + b.height - rect.y;
+    }
+
+    return rect;
   }
+  return false;
 }
 
 function clamp( val, low, high ) {
   return Math.min( Math.max( val, low ), high );
 }
 
-function testPlayer( _x, _y, debug ) {
-  var x = _x === undefined ? clamp( players[ pid ].x, 0, bg.width ) : _x,
-    y = _y === undefined ? clamp( players[ pid ].y, 0, bg.height ) : _y,
-    hit = testArea( x, y, 50, 50, 0.05, debug );
-
-  if ( !!debug ) {
-    console.log( 'player hit?', hit );
-  }
-
-  return hit;
-}
-
-function testLeft( _x, _y, debug ) {
-  var x = _x === undefined ? clamp( players[ pid ].x, 0, bg.width ) : _x,
-    y = _y === undefined ? clamp( players[ pid ].y, 0, bg.height ) : _y,
-    hit = testArea( x, y, 5, 50, 0.85, debug );
-
-  if ( !!debug ) {
-    console.log( 'left hit?', hit );
-  }
-
-  return hit;
-}
-
-function testRight( _x, _y, debug ) {
-  var x = _x === undefined ? clamp( players[ pid ].x + 45, 0, bg.width ) : _x,
-    y = _y === undefined ? clamp( players[ pid ].y, 0, bg.height ) : _y,
-    hit = testArea( x, y, 5, 50, 0.85, debug );
-
-  if ( !!debug ) {
-    console.log( 'right hit?', hit );
-  }
-
-  return hit;
-}
-
-function testTop( _x, _y, debug ) {
-  var x = _x === undefined ? clamp( players[ pid ].x, 0, bg.width ) : _x,
-    y = _y === undefined ? clamp( players[ pid ].y, 0, bg.height ) : _y,
-    hit = testArea( x, y, 50, 5, 0.85, debug );
-
-  if ( !!debug ) {
-    console.log( 'top hit?', hit );
-  }
-
-  return hit;
-}
-
-function testBottom( _x, _y, debug ) {
-  var x = _x === undefined ? clamp( players[ pid ].x, 0, bg.width ) : _x,
-    y = _y === undefined ? clamp( players[ pid ].y + 45, 0, bg.height ) : _y,
-    hit = testArea( x, y, 50, 5, 0.85, debug );
-
-  if ( !!debug ) {
-    console.log( 'bottom hit?', hit );
-  }
-
-  return hit;
-}
-
-function testArea( x, y, w, h, allowance, debug ) {
+function testWall( x, y, w, h, allowance, debug ) {
   var d = context.getImageData( x, y, w, h ).data,
     avg = 0,
     pct = 0,
@@ -382,30 +406,42 @@ window.onbeforeunload = function() {
   players[ pid ] = new Player();
   players[ pid ].x = x;
   players[ pid ].y = y;
-	Meteor.call( 'update', pid, players[ pid ] );
+  Meteor.call( 'update', pid, players[ pid ] );
 };
 
 //  If key being pushed is recognized for game control, prevent default and flag true
 window.onkeydown = function( e ) {
   switch ( e.keyCode ) {
-    case keys[ 'Left' ]:
-    case keys[ 'A' ]:
+    case keys.Left:
+    case keys.A:
       leftActive = true;
+      rightActive =
+      upActive =
+      downActive = false;
       e.preventDefault();
       break;
-    case keys[ 'Right' ]:
-    case keys[ 'D' ]:
+    case keys.Right:
+    case keys.D:
       rightActive = true;
+      leftActive =
+      upActive =
+      downActive = false;
       e.preventDefault();
       break;
-    case keys[ 'Up' ]:
-    case keys[ 'W' ]:
+    case keys.Up:
+    case keys.W:
       upActive = true;
+      leftActive =
+      rightActive =
+      downActive = false;
       e.preventDefault();
       break;
-    case keys[ 'Down' ]:
-    case keys[ 'S' ]:
+    case keys.Down:
+    case keys.S:
       downActive = true;
+      leftActive =
+      rightActive =
+      upActive = false;
       e.preventDefault();
       break;
   }
@@ -414,23 +450,23 @@ window.onkeydown = function( e ) {
 //  If key being released is recognized for game control, prevent default and flag false
 window.onkeyup = function( e ) {
   switch ( e.keyCode ) {
-    case keys[ 'Left' ]:
-    case keys[ 'A' ]:
+    case keys.Left:
+    case keys.A:
       leftActive = false;
       e.preventDefault();
       break;
-    case keys[ 'Right' ]:
-    case keys[ 'D' ]:
+    case keys.Right:
+    case keys.D:
       rightActive = false;
       e.preventDefault();
       break;
-    case keys[ 'Up' ]:
-    case keys[ 'W' ]:
+    case keys.Up:
+    case keys.W:
       upActive = false;
       e.preventDefault();
       break;
-    case keys[ 'Down' ]:
-    case keys[ 'S' ]:
+    case keys.Down:
+    case keys.S:
       downActive = false;
       e.preventDefault();
       break;
