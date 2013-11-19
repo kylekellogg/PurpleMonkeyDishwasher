@@ -6,19 +6,16 @@ var players = {},
     'Up': 38,
     'Right': 39,
     'Down': 40,
-    37: 'Left',
-    38: 'Up',
-    39: 'Right',
-    40: 'Down',
     'W': 87,
     'A': 65,
     'S': 83,
     'D': 68,
-    87: 'W',
-    65: 'A',
-    83: 'S',
-    68: 'D'
   },
+
+  leftKeyDown = false,
+  rightKeyDown = false,
+  upKeyDown = false,
+  downKeyDown = false,
 
   leftActive = false,
   upActive = false,
@@ -27,6 +24,8 @@ var players = {},
 
   walls = {},
   wallImages = [],
+
+  lastPos = {x:0,y:0},
 
   frameCount = 0,
 
@@ -101,6 +100,8 @@ function ready(e) {
     players[ pid ].ai = false;
     players[ pid ].fill = 'rgb('+Math.round(Math.random()*255)+','+Math.round(Math.random()*255)+','+Math.round(Math.random()*255)+')';
 
+    lastPos = {x: 50, y: 50};
+
     Meteor.call( 'update', pid, players[ pid ] );
 
     Meteor.subscribe( 'Players', function() {
@@ -138,12 +139,33 @@ function ready(e) {
   bg = new Image();
   bg.addEventListener( 'load', function() {
     console.log( 'bg', bg.width, bg.height );
-    findWalls();
+    loadWalls();
+    //findWalls();
   } );
   bg.src = 'images/floor.jpg?' + Date.now();
 }
 
-function findWalls() {
+function loadWalls() {
+  var r = new XMLHttpRequest();
+  r.onreadystatechange = function () {
+    if (r.readyState != 4 || r.status != 200) return;
+    walls = JSON.parse( r.responseText );
+
+    (function animLoop() {
+      requestAnimFrame( animLoop );
+      //  Make sure only checking against bg image and not players as well
+      drawBG();
+      update();
+      draw();
+      Meteor.call( 'update', pid, players[ pid ] );
+      frameCount++;
+    })();
+  };
+  r.open( "GET", "walls.json", false );
+  r.send();
+}
+
+/*function findWalls() {
   var x,y,lx,ly,queue;
   drawBG();
 
@@ -213,9 +235,12 @@ function findWalls() {
     }
   }
 
+  var json = JSON.stringify( walls );
+  console.log( json );
+
   var o = queue.shift();
   o.img.src = o.src;
-}
+}*/
 
 function drawBG() {
   var mx = !!pid && !!players && !!players[ pid ] ? players[ pid ].mapX : 0,
@@ -223,14 +248,14 @@ function drawBG() {
   context.clearRect( 0, 0, canvas.width, canvas.height );
   context.fillStyle = 'rgb(255,255,255)';
   context.drawImage( bg, mx, my );
-  if ( wallImages ) {
+  /*if ( wallImages ) {
     for ( var i = 0, l = wallImages.length; i < l; i++ ) {
       var wallImage = wallImages[ i ],
         x = wallImage.x + mx,
         y = wallImage.y + my;
       context.drawImage( wallImage.img, x, y );
     }
-  }
+  }*/
 }
 
 function draw() {
@@ -270,7 +295,10 @@ function move( val /* string */, amount, clampLow, clampHigh, mapClampLow, mapCl
     }
   }
 
-  if ( players[ pid ][ map ] !== undefined ) {
+  if ( players[ pid ][ map ] !== undefined &&
+    ((players[ pid ].x !== lastPos.x || players[ pid ].y !== lastPos.y) ||
+    ((players[ pid ][ val ] === clampLow || players[ pid ][ val ] === clampHigh) &&
+      players[ pid ][ map ] !== mapClampLow || players[ pid ][ map ] !== mapClampHigh)) ) {
     players[ pid ][ map ] -= amount;
 
     //  Test bounds for map
@@ -291,19 +319,55 @@ function move( val /* string */, amount, clampLow, clampHigh, mapClampLow, mapCl
       }
     }
   }
+
+  lastPos.x = players[ pid ].x;
+  lastPos.y = players[ pid ].y;
 }
 
 //  Move using bool flags for directions
 function update() {
-  if ( leftActive ) {
-    move( 'x', -5, players[ pid ].width, canvas.width - 100, -(bg.width - canvas.width), 0 );
-  } else if ( rightActive ) {
-    move( 'x', 5, players[ pid ].width, canvas.width - 100, -(bg.width - canvas.width), 0 );
-  } else if ( upActive ) {
-    move( 'y', -5, players[ pid ].height, canvas.height - 100, -(bg.height - canvas.height), 0 );
-  } else if ( downActive ) {
-    move( 'y', 5, players[ pid ].height, canvas.height - 100, -(bg.height - canvas.height), 0 );
+  if ( !!pid && !!players && !!players[ pid ] ) {
+    var moved = false;
+
+    if ( leftActive ) {
+      if ( !willHitWall( players[ pid ].x - 5 ) ) {
+        move( 'x', -5, players[ pid ].width, canvas.width - 100, -(bg.width - canvas.width), 0 );
+        moved = true;
+      }
+    }
+    if ( rightActive ) {
+      if ( !willHitWall( players[ pid ].x + 5 ) ) {
+        move( 'x', 5, players[ pid ].width, canvas.width - 100, -(bg.width - canvas.width), 0 );
+        moved = true;
+      }
+    }
+    if ( upActive ) {
+      if ( !willHitWall( undefined, players[ pid ].y - 5 ) ) {
+        move( 'y', -5, players[ pid ].height, canvas.height - 100, -(bg.height - canvas.height), 0 );
+        moved = true;
+      }
+    }
+    if ( downActive ) {
+      if ( !willHitWall( undefined, players[ pid ].y + 5 ) ) {
+        move( 'y', 5, players[ pid ].height, canvas.height - 100, -(bg.height - canvas.height), 0 );
+        moved = true;
+      }
+    }
   }
+}
+
+function willHitWall( _x, _y, _w, _h ) {
+  var mockPlayer = {};
+
+  _x = _x || players[ pid ].x;
+  _y = _y || players[ pid ].y;
+  _w = _w || players[ pid ].width;
+  _h = _h || players[ pid ].height;
+
+  mockPlayer.x = _x;
+  mockPlayer.y = _y;
+  mockPlayer.width = _w;
+  mockPlayer.height = _h;
 
   for ( var x in walls ) {
     if ( walls.hasOwnProperty( x ) ) {
@@ -312,18 +376,33 @@ function update() {
           for ( var i = 0, l = walls[x][y].length; i < l; i++ ) {
             var wall = walls[x][y][i],
               mockWall = new Wall( wall.x + players[ pid ].mapX, wall.y + players[ pid ].mapY, wall.width, wall.height ),
-              intersection = intersects( players[ pid ], mockWall );
+              intersection = intersects( mockPlayer, mockWall );
             if ( !!intersection ) {
               if ( intersection.width === 0 || intersection.height === 0 ) continue;
 
               if ( leftActive ) {
-                move( 'x', intersection.width, players[ pid ].width, canvas.width - 100, -(bg.width - canvas.width), 0 );
-              } else if ( rightActive ) {
-                move( 'x', -intersection.width, players[ pid ].width, canvas.width - 100, -(bg.width - canvas.width), 0 );
-              } else if ( upActive ) {
-                move( 'y', intersection.height, players[ pid ].height, canvas.height - 100, -(bg.height - canvas.height), 0 );
-              } else if ( downActive ) {
-                move( 'y', -intersection.height, players[ pid ].height, canvas.height - 100, -(bg.height - canvas.height), 0 );
+                // players[ pid ].x = wall.x + wall.width + players[ pid ].mapX;
+                // move( 'x', intersection.width, players[ pid ].width, canvas.width - 100, -(bg.width - canvas.width), 0 );
+                leftActive = false;
+                return true;
+              }
+              if ( rightActive ) {
+                // players[ pid ].x = wall.x - players[ pid ].width + players[ pid ].mapX;
+                // move( 'x', -intersection.width, players[ pid ].width, canvas.width - 100, -(bg.width - canvas.width), 0 );
+                rightActive = false;
+                return true;
+              }
+              if ( upActive ) {
+                // players[ pid ].y = wall.y + wall.height + players[ pid ].mapY;
+                // move( 'y', intersection.height, players[ pid ].height, canvas.height - 100, -(bg.height - canvas.height), 0 );
+                upActive = false;
+                return true;
+              }
+              if ( downActive ) {
+                // players[ pid ].y = wall.y - players[ pid ].height + players[ pid ].mapY;
+                // move( 'y', -intersection.height, players[ pid ].height, canvas.height - 100, -(bg.height - canvas.height), 0 );
+                downActive = false;
+                return true;
               }
             }
           }
@@ -331,6 +410,8 @@ function update() {
       }
     }
   }
+
+  return false;
 }
 
 function intersects( a, b ) {
@@ -414,34 +495,42 @@ window.onkeydown = function( e ) {
   switch ( e.keyCode ) {
     case keys.Left:
     case keys.A:
+      if ( leftKeyDown ) {
+        e.preventDefault();
+        return;
+      }
+      leftKeyDown = true;
       leftActive = true;
-      rightActive =
-      upActive =
-      downActive = false;
       e.preventDefault();
       break;
     case keys.Right:
     case keys.D:
+      if ( rightKeyDown ) {
+        e.preventDefault();
+        return;
+      }
+      rightKeyDown = true;
       rightActive = true;
-      leftActive =
-      upActive =
-      downActive = false;
       e.preventDefault();
       break;
     case keys.Up:
     case keys.W:
+      if ( upKeyDown ) {
+        e.preventDefault();
+        return;
+      }
+      upKeyDown = true;
       upActive = true;
-      leftActive =
-      rightActive =
-      downActive = false;
       e.preventDefault();
       break;
     case keys.Down:
     case keys.S:
+      if ( downKeyDown ) {
+        e.preventDefault();
+        return;
+      }
+      downKeyDown = true;
       downActive = true;
-      leftActive =
-      rightActive =
-      upActive = false;
       e.preventDefault();
       break;
   }
@@ -453,21 +542,25 @@ window.onkeyup = function( e ) {
     case keys.Left:
     case keys.A:
       leftActive = false;
+      leftKeyDown = false;
       e.preventDefault();
       break;
     case keys.Right:
     case keys.D:
       rightActive = false;
+      rightKeyDown = false;
       e.preventDefault();
       break;
     case keys.Up:
     case keys.W:
       upActive = false;
+      upKeyDown = false;
       e.preventDefault();
       break;
     case keys.Down:
     case keys.S:
       downActive = false;
+      downKeyDown = false;
       e.preventDefault();
       break;
   }
